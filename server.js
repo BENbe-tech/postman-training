@@ -2,28 +2,24 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-super-secret-key';
 
-const allowedOrigins = [
-];
-
 app.use(cors());
-
 app.use(express.json());
 
-// Mocked in-memory data store for demo CRUD operations.
+// Mocked in-memory data store
 let items = [
-  { id: 1, name: 'Laptop', category: 'Electronics'},
+  { id: 1, name: 'Laptop', category: 'Electronics' },
   { id: 2, name: 'Notebook', category: 'Stationery' },
-  { id: 3, name: 'Coffee Mug', category: 'Kitchen' },
-  { id: 4, name: 'Milk', category: 'Kitchen'},
-  { id: 5, name: 'Rice', category: 'Kitchen'}
+  { id: 3, name: 'Coffee Mug', category: 'Kitchen' }
 ];
-let nextId = 6;
+let nextId = 4;
 
+// 🔐 Auth middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ')
@@ -42,68 +38,47 @@ function authenticateToken(req, res, next) {
   }
 }
 
+// 🔑 Login
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
 
-  // Mock authentication. Replace with DB/user-service validation in production.
   if (username === 'admin' && password === 'Admin@123') {
     const token = jwt.sign({ username, role: 'admin' }, JWT_SECRET, {
       expiresIn: '1h'
     });
 
-    return res.json({ token});
+    return res.json({ token });
   }
 
   return res.status(401).json({ message: 'Invalid credentials' });
 });
 
+// � Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// �📦 Get items (with filters)
 app.get('/api/items', authenticateToken, (req, res) => {
-  const { name, category, id, sort, sortby } = req.query;
+  const { name, category, id } = req.query;
   let filteredItems = items;
-
-// asc or desc
-if (sort && sortby) {
-  filteredItems = filteredItems.sort((a, b) => {
-    let valA = a[sortby];
-    let valB = b[sortby];
-
-  
-    if (typeof valA === "string" && typeof valB === "string") {
-      valA = valA.toLowerCase();
-      valB = valB.toLowerCase();
-
-      return sort === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
-    }
-
-    if (typeof valA === "number" && typeof valB === "number") {
-      return sort === "asc" ? valA - valB : valB - valA;
-    }
-
-
-    return 0;
-
-  });
-}
-
 
   if (id) {
     const parsedId = Number(id);
-    if (!Number.isNaN(parsedId)) {
-      filteredItems = filteredItems.filter((item) => item.id === parsedId);
-    } else {
-      filteredItems = [];
-    }
+    filteredItems = Number.isNaN(parsedId)
+      ? []
+      : filteredItems.filter((item) => item.id === parsedId);
   }
 
   if (name) {
-    const normalizedName = String(name).trim().toLowerCase();
+    const normalizedName = String(name).toLowerCase();
     filteredItems = filteredItems.filter((item) =>
       item.name.toLowerCase().includes(normalizedName)
     );
   }
 
   if (category) {
-    const normalizedCategory = String(category).trim().toLowerCase();
+    const normalizedCategory = String(category).toLowerCase();
     filteredItems = filteredItems.filter((item) =>
       item.category.toLowerCase().includes(normalizedCategory)
     );
@@ -112,9 +87,9 @@ if (sort && sortby) {
   res.json(filteredItems);
 });
 
-
+// 📦 Get item by ID
 app.get('/api/items/:id', authenticateToken, (req, res) => {
-  const id = Number.parseInt(req.params.id, 10);
+  const id = Number(req.params.id);
   const item = items.find((entry) => entry.id === id);
 
   if (!item) {
@@ -124,6 +99,7 @@ app.get('/api/items/:id', authenticateToken, (req, res) => {
   return res.json(item);
 });
 
+// ➕ Create item fixing bug
 app.post('/api/items', authenticateToken, (req, res) => {
   const { name, category } = req.body;
 
@@ -131,19 +107,20 @@ app.post('/api/items', authenticateToken, (req, res) => {
     return res.status(400).json({ message: 'name and category are required' });
   }
 
-  const newItem = { id: nextId, name, category };
-  nextId += 1;
+  const newItem = { id: nextId++, name, category };
   items.push(newItem);
 
   return res.status(201).json(newItem);
 });
 
+// ✏️ Update item (PUT)
 app.put('/api/items/:id', authenticateToken, (req, res) => {
-  const id = Number.parseInt(req.params.id, 10);
+  const id = Number(req.params.id);
   const { name, category } = req.body;
-  const itemIndex = items.findIndex((entry) => entry.id === id);
 
-  if (itemIndex === -1) {
+  const index = items.findIndex((item) => item.id === id);
+
+  if (index === -1) {
     return res.status(404).json({ message: 'Item not found' });
   }
 
@@ -151,47 +128,67 @@ app.put('/api/items/:id', authenticateToken, (req, res) => {
     return res.status(400).json({ message: 'name and category are required' });
   }
 
-  items[itemIndex] = { id, name, category };
-  return res.json(items[itemIndex]);
+  items[index] = { id, name, category };
+  return res.json(items[index]);
 });
 
+// 🗑 Delete item
 app.delete('/api/items/:id', authenticateToken, (req, res) => {
-  const id = Number.parseInt(req.params.id, 10);
-  const itemIndex = items.findIndex((entry) => entry.id === id);
+  const id = Number(req.params.id);
+  const index = items.findIndex((item) => item.id === id);
 
-  if (itemIndex === -1) {
+  if (index === -1) {
     return res.status(404).json({ message: 'Item not found' });
   }
 
-  const deleted = items[itemIndex];
-  items.splice(itemIndex, 1);
+  const deleted = items.splice(index, 1)[0];
   return res.json(deleted);
 });
 
-// add route for patch
+// 🔧 Patch item
 app.patch('/api/items/:id', authenticateToken, (req, res) => {
-  const id = Number.parseInt(req.params.id, 10);
+  const id = Number(req.params.id);
   const { name, category } = req.body;
-  const itemIndex = items.findIndex((entry) => entry.id === id);
 
-  if (itemIndex === -1) {
+  const index = items.findIndex((item) => item.id === id);
+
+  if (index === -1) {
     return res.status(404).json({ message: 'Item not found' });
   }
 
-  if (name) {
-    items[itemIndex].name = name;
-  }
+  if (name) items[index].name = name;
+  if (category) items[index].category = category;
 
-  if (category) {
-    items[itemIndex].category = category;
-  }
-
-  return res.json(items[itemIndex]);
+  return res.json(items[index]);
 });
 
+// 🌐 Serve Angular only if build exists (safe for CI)
+const projectPath = path.join(
+  process.env.HOME || '',
+  'Desktop',
+  'angularTraining',
+  'dist',
+  'angularTraining',
+  'browser'
+);
 
+if (fs.existsSync(projectPath) && process.env.NODE_ENV !== 'ci') {
+  app.use(express.static(projectPath));
 
+  app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(projectPath, 'index.html'));
+  });
+}
 
-app.listen(port, () => {
+// 🧩 OPTIONS handler
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// 🚀 Start server
+app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`);
 });
