@@ -50,4 +50,4 @@ jobs:
           fi
 
           echo "Running Postman tests..."
-          postman collection run "21282524-25b85f21-2db1-4782-a808-0c7e43fc8aed"-e "21282524-0ee5f34c-4fa2-4156-9e0d-f9055b30e3f5"
+          postman collection run "21282524-25b85f21-2db1-4782-a808-0c7e43fc8aed" -e "21282524-0ee5f34c-4fa2-4156-9e0d-f9055b30e3f5"
