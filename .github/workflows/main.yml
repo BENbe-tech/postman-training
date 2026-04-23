@@ -1,28 +1,30 @@
 name: Automated API tests using Postman CLI
 
-on: 
- push:
-   branches: [main]
- workflow_dispatch:
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   automated-api-tests:
     runs-on: ubuntu-latest
 
     env:
-     PORT: 3000
-     NODE_ENV: ci
-     
+      PORT: 3000
+      NODE_ENV: ci
+
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependency
+
+      - name: Install dependencies
         run: npm install
-      
+
       - name: Install Postman CLI
-        run: |
-          curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+        run: curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+
       - name: Start server and run Postman tests
         run: |
           echo "Starting server..."
@@ -46,5 +48,6 @@ jobs:
             cat server.log || true
             exit 1
           fi
+
           echo "Running Postman tests..."
-          postman collection run "21282524-25b85f21-2db1-4782-a808-0c7e43fc8aed" -e "21282524-0ee5f34c-4fa2-4156-9e0d-f9055b30e3f5"
+          postman collection run "21282524-25b85f21-2db1-4782-a808-0c7e43fc8aed"-e "21282524-0ee5f34c-4fa2-4156-9e0d-f9055b30e3f5"
